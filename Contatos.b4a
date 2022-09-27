@@ -1,0 +1,451 @@
+﻿Build1=Contact,br.tssistemas.contatos
+File1=1.bal
+FileGroup1=Default Group
+Group=Default Group
+Library1=contentresolver
+Library2=core
+Library3=mssql
+Library4=xui
+Library5=xcustomlistview
+Library6=runtimepermissions
+Library7=sql
+Library8=firebasestorage
+ManifestCode='This code will be applied to the manifest file during compilation.~\n~'You do not need to modify it in most cases.~\n~'See this link for for more information: https://www.b4x.com/forum/showthread.php?p=78136~\n~AddManifestText(~\n~<uses-sdk android:minSdkVersion="4"/>~\n~<supports-screens android:largeScreens="true" ~\n~    android:normalScreens="true" ~\n~    android:smallScreens="true" ~\n~    android:anyDensity="true"/>)~\n~SetApplicationAttribute(android:icon, "@drawable/icon")~\n~SetApplicationAttribute(android:label, "$LABEL$")~\n~CreateResourceFromFile(Macro, Themes.LightTheme)~\n~~\n~'End of default text.~\n~AddPermission("android.permission.READ_CONTACTS")~\n~AddPermission("android.permission.WRITE_CONTACTS") ~\n~'if write access is required
+Module1=ContactsUtils
+NumberOfFiles=1
+NumberOfLibraries=8
+NumberOfModules=1
+Version=11.8
+@EndOfDesignText@
+#Region  Project Attributes 
+	#ApplicationLabel: Lista de Contatos
+	#VersionCode: 1
+	#VersionName: 
+	'SupportedOrientations possible values: unspecified, landscape or portrait.
+	#SupportedOrientations: portrait
+	#CanInstallToExternalStorage: False
+#End Region
+
+#Region  Activity Attributes 
+	#FullScreen: False
+	#IncludeTitle: True
+#End Region
+
+
+' Dim i As Intent
+'   i.Initialize(i.ACTION_VIEW, "content://com.android.contacts/contacts/1000")
+'   StartActivity(i)
+'   
+
+Sub Process_Globals
+	Private cu As ContactsUtils
+	Private rp As RuntimePermissions
+	
+	
+	
+End Sub
+
+Sub Globals
+	Dim contactId As Long
+	Private ImageView1 As B4XView
+	Private EditText1 As B4XView
+	Private CLV1 As CustomListView
+	Private txtContato As EditText
+	Private txtFone As EditText
+	Private pa As Panel
+	
+	Dim cn As MSSQL
+	Dim aList As List
+	
+	Private cr As ContentResolver
+	
+	Private btImportar As Button
+	Private btExcluirImportados As Button
+	
+	Dim timer As Timer
+	
+	Dim pa As Panel
+	Dim lbl As Label
+	
+	Private pac As Panel
+End Sub
+
+Sub Activity_Create(FirstTime As Boolean)
+	
+	
+	If FirstTime Then
+		cu.Initialize
+		cr.Initialize("cr")
+	End If
+	
+	Activity.LoadLayout("1")
+	pac.Visible=False
+	
+	
+	timer.Enabled = False
+	timer.Interval = 6000
+	
+	rp.CheckAndRequest(rp.PERMISSION_READ_CONTACTS)
+	Wait For Activity_PermissionResult (Permission As String, Result As Boolean)
+	If Result Then 
+		
+		rp.CheckAndRequest(rp.PERMISSION_WRITE_CONTACTS)
+		Wait For Activity_PermissionResult (Permission As String, Result As Boolean)
+		If Result Then
+			For Each c As cuContact In cu.FindAllContacts(True)
+				CLV1.AddTextItem(c.DisplayName, c)
+			Next
+		Else
+			ToastMessageShow("No permission", True)
+		End If
+		
+	Else
+		ToastMessageShow("No permission", True)
+	End If
+	
+	pa.Initialize( "" )
+	lbl.Initialize( "" )
+	lbl.Text = "Aqui"
+	lbl.TextSize=16
+	lbl.TextColor = Colors.White
+	lbl.Gravity=Gravity.CENTER_HORIZONTAL
+	
+	pa.Color = Colors.RGB( 106, 142, 174 )
+	
+	pa.AddView( lbl, 0%x, 12%y, 90%x, 12%y )
+	Activity.AddView( pa, 5%x, 20%y, 90%x, 30%y )
+	
+	pa.Visible=False
+	
+	
+	
+End Sub
+
+Sub Activity_Resume
+
+End Sub
+
+Sub Activity_Pause (UserClosed As Boolean)
+
+End Sub
+
+Sub CLV1_ItemLongClick (Index As Int, Value As Object)
+	Dim c As cuContact = Value
+	cu.SetStarred(c.Id, Not(cu.GetStarred(c.Id)))
+	'update the text
+	CLV1_ItemClick(Index, Value)
+End Sub
+
+
+Sub CLV1_ItemClick (Index As Int, Value As Object)
+	Dim c As cuContact = Value
+	
+	contactId = c.Id
+	
+	Dim bmp As Bitmap = cu.GetPhoto(c.Id)
+	If bmp.IsInitialized Then ImageView1.SetBitmap(bmp) Else ImageView1.SetBitmap(Null)
+	Dim sb As StringBuilder
+	sb.Initialize
+	sb.Append(c.DisplayName).Append(CRLF).Append("Note: ").Append(cu.GetNote(c.Id)).Append(CRLF)
+ 
+	For Each phone As cuPhone In cu.GetPhones(c.Id)
+		sb.Append(phone.Number & ", " & phone.PhoneType).Append(CRLF)
+	Next
+	For Each email As cuEmail In cu.GetEmails(c.Id)
+		sb.Append(email.email).Append(", ").Append(email.EmailType).Append(CRLF)
+	Next
+	EditText1.Text = sb.ToString
+	
+	cu.SetNote( contactId, "Olá sou uma notação" )
+	
+'
+End Sub
+
+Sub btExcluir_Click 
+	
+	If contactId  > 0 Then
+	 
+		Dim n As Int
+		n = Msgbox2(  "Deseja Excluir deste Contato  ?", "Excluir ?", "Sim", "", "Não", Null )
+		If n = DialogResponse.POSITIVE Then
+
+			n = Msgbox2( "Ultima Chance, Excluir ?", "Certeza ?", "Sim", "", "Não", Null )
+			
+			If n = DialogResponse.POSITIVE Then
+				cu.DeleteContact( contactId )
+		
+				EditText1.Text = ""
+			
+				CLV1.Clear
+				For Each c As cuContact In cu.FindAllContacts(True)
+					CLV1.AddTextItem(c.DisplayName, c)
+				Next
+				
+			End If
+		End If
+
+	End If
+	
+'	Dim Id As Int 
+'	Id = cu.FindIdByPhone(  "1111-1111", False, False)
+'	
+'	If Id > 0 Then
+'		cu.DeleteContact( Id )
+'		
+'		CLV1.Clear
+'		For Each c As cuContact In cu.FindAllContacts(True)
+'			CLV1.AddTextItem(c.DisplayName, c)
+'		Next
+'		
+'		
+'	End If
+	 
+End Sub
+ 
+ 
+Sub btSalvar_Click
+	
+	pac.Visible=False
+	
+	If txtContato.Text.Trim <> "" And _ 
+	   txtFone.Text.Trim <> "" Then  
+	
+		cu.InsertContact(  txtContato.Text, txtFone.Text )
+	 
+		CLV1.Clear
+	
+		For Each c As cuContact In cu.FindAllContacts(True)
+			CLV1.AddTextItem(c.DisplayName, c)			
+		Next
+		
+		CLV1.PressedColor = Colors.Green
+	
+		
+		txtContato.Text = ""
+		txtFone.Text = ""
+		
+	End If
+	
+End Sub
+ 
+Sub btCancelar_Click
+	pac.Visible=False
+End Sub
+
+Sub btAdicionar_Click
+	pac.Visible=True
+End Sub
+
+
+Sub btExcluirImportados_Click
+	
+	Wait For( ExcluirContatosImportados) Complete (Result As Boolean)
+	 
+	
+	lbl.Text ="Atualizando Lista ..."
+	DoEvents
+ 
+		
+	CLV1.Clear
+	
+	For Each c As cuContact In cu.FindAllContacts(True)
+		CLV1.AddTextItem(c.DisplayName, c)
+	Next
+		
+	CLV1.PressedColor = Colors.Green
+	 
+	lbl.Text = "Pronto"
+	DoEvents
+	
+	lbl.Visible=False
+	pa.Visible=False
+  
+	 
+	
+End Sub
+
+Sub ExcluirContatosImportados As ResumableSub
+
+	Private PeopleProjection() As String = Array As String("times_contacted", "last_time_contacted", _
+     													    "display_name", "has_phone_number", _
+															"starred", "_id", "photo_id")
+ 
+	Dim u As Uri
+	u.Parse("content://com.android.contacts/contacts")
+	cr.QueryAsync(u,  PeopleProjection, "", Null, "" )
+	Return (True ) 
+End Sub
+
+
+Sub CR_QueryCompleted (Success As Boolean, Crsr As Cursor)
+	
+	If Success = False Then
+		Log(LastException)
+	Else
+		
+		 
+		Dim parImportarGeral As Boolean = False
+	
+		Dim n As Int
+		n = Msgbox2(  "Excluir Todos os Clientes ?", "Excluir ?", "Sim", "", "Não", Null )
+	 
+	 
+	 	pa.Visible=True
+		lbl.Visible=True
+		
+		If n = DialogResponse.POSITIVE Then
+			
+			parImportarGeral = True
+		
+			lbl.Text = "Excluíndo Contatos *-"
+			DoEvents	
+			
+			For i = 0 To Crsr.RowCount - 1		 
+				
+				Crsr.Position = i			
+				Dim display_name As String  =   Crsr.GetString("display_name")
+				 
+				Try
+					If display_name.SubString2( 0, 2 ) = "*-" Then
+						cu.DeleteContact( Crsr.GetLong("_id") )
+					End If
+					
+					If display_name.SubString2( 0, 2 ) = "A-" Then
+						cu.DeleteContact( Crsr.GetLong("_id") )
+					End If
+					
+					
+					If display_name.SubString2( 0, 2 ) = "A " Then
+						cu.DeleteContact( Crsr.GetLong("_id") )
+					End If
+					
+					
+				Catch
+					Log(LastException)
+				End Try			
+				
+			Next
+			Crsr.Close
+ 
+			'exclui todos os clientes que fora importados
+		End If
+		
+		lbl.Visible=False
+		pa.Visible=False
+	
+	End If
+	
+End Sub
+ 
+Sub btImportar_Click
+
+	IMPORTAR_CLIENTES( True )
+	
+
+	lbl.Text ="Atualizando Lista ..."
+	DoEvents
+
+	
+	CLV1.Clear
+
+	For Each c As cuContact In cu.FindAllContacts(True)
+		CLV1.AddTextItem(c.DisplayName, c)
+	Next
+	
+	CLV1.PressedColor = Colors.Green
+ 
+	lbl.Text = "Pronto"
+	DoEvents
+
+	lbl.Visible=False
+	pa.Visible=False
+  
+ 
+	
+End Sub
+	 
+	 
+Sub IMPORTAR_CLIENTES( parImportarGeral As Boolean )
+	
+	pa.Visible=True
+	lbl.Visible=True
+	 
+	lbl.Text = "Aguarde ..." & CRLF & "Conectando ao DB"
+	DoEvents
+	
+	'conexao com SQLSERVER
+	cn.setDatabase( "192.168.1.1", "banco", "user", "senha" )
+	
+	aList = cn.TableList
+		
+	'verifica se existe conexão com o banco de dados SQLServer
+	If aList.IsInitialized=False Then
+		btImportar.Text = "Importar"
+		Msgbox( "Problemas na conexão !", "Ops !" )
+		lbl.Text = LastException.Message
+		Return
+	End If
+	
+	lbl.Text = "Importando Clientes ..."
+	DoEvents
+	
+	DateTime.DateFormat = "dd/MM/yyyy"
+	
+	Dim aCampos() As String
+	Dim aDados As String
+	Dim bCampos() As String
+	
+	Dim nReg As Long
+	Dim vsql As String
+	 
+	Try
+	 
+	 	pa.Visible=True
+		lbl.Visible=True
+	 
+		aList = cn.Query( "select id,nome fone from tblclientes")
+					
+		nReg = ( aList.Size - 1 )
+		If ( nReg  > 0 ) Then
+			
+			'10 posicoes sao padrao, vai que a sp ainda nao foi configurada
+			bCampos = Array As String( "", "", "", "", "", "", "", "", "", "", "", "")
+							
+			For  i =  1 To nReg
+		 
+				aDados = aList.Get(i)
+				aCampos = Regex.Split( ",",  aDados.Replace("[", "" ).Replace( "]", "" ) )
+
+				'esses elementos devem er padroes
+				bCampos(0) = ""
+				bCampos(1) = ""
+				bCampos(2) = ""
+				bCampos(3) = ""
+				bCampos(4) = ""
+				bCampos(5) = ""
+				bCampos(6) = ""
+										
+				For n=0 To aCampos.Length -1
+					bCampos(n) = aCampos(n)
+				Next
+				
+				cu.InsertContact(  bCampos(2), bCampos(3) )
+				 
+				lbl.Text =   i & " de " & nReg & CRLF & "" &  NumberFormat2( (i/nReg) * 100, 0,3,3,False) & " %"
+				DoEvents
+				
+				'cu.SetNote( contactId, "Olá sou uma notação" )
+				
+			Next
+							
+		End If
+			
+	Catch
+		Log(LastException)
+	End Try
+	
+	
+	
+ 	 
+End Sub
+
